@@ -1,0 +1,344 @@
+---
+title: "Mini-Project-2"
+author: "Ajinkya Pawale"
+date: "11/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+cb_palette = c("#999999", "#E69F00", "#56B4E9", "#009E73",
+"#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(MASS)
+library(jpeg)
+library(RCurl)
+library(grid)
+library(png)
+library(GGally)
+library(dplyr)
+library(mgcv)
+```
+
+```{r}
+load('CCES16_Common_OUTPUT_Feb2018_VV.RData')
+data=x
+```
+
+```{r}
+remove(x)
+```
+
+```{r}
+lis = c('commonweight_vv_post','tookpost','gender','educ','race','pid7','CC16_326','CC16_410a','CC16_331_1','CC16_331_2','CC16_331_3','CC16_331_7')
+data = data[,lis]
+```
+
+```{r}
+obama = filter(data, tookpost == 'Yes' & CC16_326=="Barack Obama")
+```
+
+```{r}
+obama$isTrump[obama$CC16_410a == 'Donald Trump (Republican)'] = 1
+obama$isTrump[obama$CC16_410a != 'Donald Trump (Republican)'] = 0
+obama$isTrump[is.na(obama$isTrump)] = 0
+```
+
+```{r}
+obama$pro.img = 0
+for (i in 1:nrow(obama))
+{
+if (obama$CC16_331_1[i] == 'Yes') 
+{
+  obama$pro.img[i] = obama$pro.img[i]  + 1
+  
+} 
+if (obama$CC16_331_2[i]  == 'No')
+{
+  obama$pro.img[i] = obama$pro.img[i] + 1
+} 
+if (obama$CC16_331_3[i] == 'Yes')
+{
+  obama$pro.img[i] = obama$pro.img[i]  + 1
+} 
+if (obama$CC16_331_7[i]  == 'No')   
+{
+  obama$pro.img[i]  = obama$pro.img[i]  + 1
+}
+}
+```
+
+```{r}
+summary(obama$race)
+```
+
+```{r}
+obama = obama %>% mutate(race=recode(race, 'White' = 'White','Black' = 'Black','Hispanic'='Hispanic',.default = "Other"))
+```
+
+```{r}
+summary(obama$educ)
+```
+
+
+```{r}
+obama = obama %>% mutate(educ_num=recode(educ, 'No HS' = 1, 'High school graduate' = 2,'Some college'=3,'2-year'=4,'4-year'=5,'Post-grad'=6))
+```
+
+
+```{r}
+summary(obama$pid7)
+```
+
+```{r}
+obama = obama %>% mutate(pid7_num=recode(pid7, 'Strong Democrat' = 1, 'Not very strong Democrat' = 2,'Strong Republican'=7,'Not very strong Republican'=6,'Lean Democrat'=3,'Lean Republican'=5,'Independent'=4,'Not Sure'=8,.default = 0))
+```
+
+```{r}
+typeof(obama$pid7_num)
+nrow(obama)
+```
+
+```{r}
+obama = obama %>% mutate(gender_num = recode(gender,'Male'=0,'Female'=1))
+```
+
+```{r}
+obama = obama %>% mutate(race_num = recode(race,'White'=0,'Black'=1,'Hispanic'=2,'Other'=3))
+```
+
+
+```{r}
+typeof(obama$isTrump)
+typeof(obama$pro.img)
+typeof(obama$educ_num)
+typeof(obama$race_num)
+typeof(obama$pid7_num)
+typeof(obama$gender_num)
+```
+
+```{r}
+lis = c('isTrump','pro.img','pid7_num','educ_num','race_num','gender_num')
+ggpairs(obama[,lis])
+```
+
+
+```{r}
+ggplot(obama, aes(x = pro.img, y = isTrump)) +
+geom_jitter(height = 0.1, width = 0.25) +
+geom_smooth(method = "glm",
+method.args = list(family = "binomial")) + facet_wrap(~pid7)+ xlab('Pro Immigration') + ylab('Voted for Trump') + ggtitle('X vs Y')
+```
+
+
+```{r}
+ggplot(obama, aes(x = pro.img, y = isTrump,color=pid7)) +
+geom_jitter(height = 0.1, width = 0.25) +
+geom_smooth(method = "glm",
+method.args = list(family = "binomial"),se=FALSE)+xlab('Pro Immigration') + ylab('Voted for Trump') + ggtitle('X vs Y')
+```
+
+
+```{r}
+ggplot(obama, aes(x = pro.img, y = isTrump)) +
+geom_jitter(height = 0.1, width = 0.25) +
+geom_smooth(method = "glm",
+method.args = list(family = "binomial")) + facet_wrap(~educ)+ xlab('Pro Immigration') + ylab('Voted for Trump') + ggtitle('X vs Y')
+```
+```{r}
+ggplot(obama, aes(x = pro.img, y = isTrump)) +
+geom_jitter(height = 0.1, width = 0.25) +
+geom_smooth(method = "glm",
+method.args = list(family = "binomial")) + facet_wrap(~race)+ xlab('Pro Immigration') + ylab('Voted for Trump') + ggtitle('X vs Y')
+```
+```{r}
+ggplot(obama, aes(x = pro.img, y = isTrump)) +
+geom_jitter(height = 0.1, width = 0.25) +
+geom_smooth(method = "glm",
+method.args = list(family = "binomial")) + facet_wrap(~gender)+ xlab('Pro Immigration') + ylab('Voted for Trump') + ggtitle('X vs Y')
+```
+
+
+```{r}
+Target.logit1 = glm(isTrump ~  pro.img * pid7_num,
+family = binomial, data = obama, weights = commonweight_vv_post)
+summary(Target.logit1)
+```
+
+
+```{r}
+sum(is.na(obama$pid7))
+```
+
+
+```{r}
+obama_omit = obama %>% drop_na(pid7)
+```
+
+```{r}
+nrow(obama_omit)
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+Target.logit2 = glm(isTrump ~  pro.img + educ_num,
+family = binomial, data = obama, weights = commonweight_vv_post)
+summary(Target.logit2)
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+#1. With No interactions for Gender demographic variable
+gender.logit=glm(isTrump~ pro.img  + gender_num,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+gender.df=expand.grid(pro.img=0:4,gender_num=c(0,1))
+gender.nointer.pred=predict(gender.logit,newdata = gender.df,type = "response")
+gender.nointer.pred=as.vector((gender.nointer.pred))
+
+#2. With interaction for Gender demographic variable
+gender.logit.inter=glm(isTrump~pro.img*gender_num,family = "binomial",data=obama,weights = obama$commonweight_vv_post)
+gender.inter.pred=predict(gender.logit.inter,type = "response",newdata = gender.df)
+gender.inter.pred=as.vector((gender.inter.pred))
+
+gender.pred.df=data.frame(gender.df,gender.nointer.pred,gender.inter.pred)
+ggplot(gender.pred.df,aes(x=gender.pred.df$pro.img))+geom_line(aes(y=gender.pred.df$gender.nointer.pred,color="No interaction"))+geom_line(aes(y=gender.pred.df$gender.inter.pred,color="with Interaction"))+facet_wrap(~gender.pred.df$gender_num)+ylab("Probability to switch to Trump")+xlab("Immigration Attitude")+ggtitle("Interaction of Gender with Immigration attitudes")
+```
+
+```{r}
+#Implementing for race
+#1. With No interactions for Race demographic variable
+
+race.logit=glm(isTrump~ pro.img + race_num ,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+race.df=expand.grid(pro.img=0:4,race_num=c(0,1,2,3))
+race.nointer.pred=predict(race.logit,newdata = race.df,type = "response")
+race.nointer.pred=as.vector((race.nointer.pred))
+
+#2. With interaction for Race demographic variable
+race.logit.inter=glm(isTrump~pro.img*race_num,family = "binomial",data=obama,weights = obama$commonweight_vv_post)
+race.inter.pred=predict(race.logit.inter,type = "response",newdata = race.df)
+race.inter.pred=as.vector((race.inter.pred))
+#Forming a new data frame
+race.pred.df=data.frame(race.df,race.nointer.pred,race.inter.pred)
+
+race.pred.df = race.pred.df %>% mutate(race = recode(race_num,'0'='White', '1'='Black','2'='Hispanic', '3'='Other'))
+
+#Ggplot
+ggplot(race.pred.df,aes(x=race.pred.df$pro.img))+geom_line(aes(y=race.pred.df$race.nointer.pred,color="No interaction"))+geom_line(aes(y=race.pred.df$race.inter.pred,color="with Interaction"))+facet_wrap(~race.pred.df$race)+ylab("Probability to switch to Trump")+xlab("Immigration Attitude")+ggtitle("Interaction of Immigration attitudes with Race")
+
+```
+```{r}
+
+#For Education
+#1. With No interactions for Education demographic variable
+#Converting quantitative
+#obama$data_preprocess.educ=as.numeric(obama$data_preprocess.educ)
+educ.logit=glm(isTrump~ pro.img + educ_num,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+educ.df=expand.grid(pro.img=0:4,educ_num=c(1,2,3,4,5,6))
+educ.nointer.pred=predict(educ.logit,newdata = educ.df,type = "response")
+educ.nointer.pred=as.vector((educ.nointer.pred))
+
+#2. With interaction for Education demographic variable
+educ.logit.inter=glm(isTrump~pro.img*educ_num,family = "binomial",data=obama,weights = obama$commonweight_vv_post)
+educ.inter.pred=predict(educ.logit.inter,type = "response",newdata = educ.df)
+educ.inter.pred=as.vector((educ.inter.pred))
+
+#Forming a new data frame
+educ.pred.df=data.frame(educ.df,educ.nointer.pred,educ.inter.pred)
+
+educ.pred.df = educ.pred.df %>% mutate(educ = recode(educ_num,'1'='No HS', '2'='High School Grad','3'='Some College', '4'='2-year' , '5'= '4-Year','6'= 'Post_grad'))
+#Ggplot
+ggplot(educ.pred.df,aes(x=educ.pred.df$pro.img))+geom_line(aes(y=educ.pred.df$educ.nointer.pred,color="No interaction"))+geom_line(aes(y=educ.pred.df$educ.inter.pred,color="with Interaction"))+facet_wrap(~educ.pred.df$educ)+ylab("Probability to switch to Trump")+xlab("Immigration Attitude")+ggtitle("Interaction of Immigration attitudes with Education")
+
+
+```
+
+
+
+```{r}
+#For party Identification
+#1. With No interactions for Party Identification demographic variable
+#Converting quantitative
+
+#obama$data_preprocess.pid7=as.numeric(obama$data_preprocess.pid7)
+pid.logit=glm(isTrump~ pro.img + pid7_num,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+pid.df=expand.grid(pro.img=0:4,pid7_num=c(1,2,3,4,5,6,7,8))
+pid.nointer.pred=predict(pid.logit,newdata = pid.df,type = "response")
+pid.nointer.pred=as.vector((pid.nointer.pred))
+
+#2. With interaction for Education demographic variable
+pid.logit.inter=glm(isTrump~pro.img*pid7_num,family = "binomial",data=obama,weights = obama$commonweight_vv_post)
+pid.inter.pred=predict(pid.logit.inter,type = "response",newdata = pid.df)
+pid.inter.pred=as.vector((pid.inter.pred))
+
+#Forming a new data frame
+pid.pred.df=data.frame(pid.df,pid.nointer.pred,pid.inter.pred)
+pid.pred.df = pid.pred.df %>% mutate(pid7= recode(pid7_num,'1'= 'Strong Democrat', '2'='Not very strong Democrat' ,'7'='Strong Republican', '6'='Not very strong Republican','3'= 'Lean Democrat','5'='Lean Republican','4'='Independent','8'='Not Sure', ' 0' ='Not Sure'))
+#Ggplot
+ggplot(pid.pred.df,aes(x=pid.pred.df$pro.img))+geom_line(aes(y=pid.pred.df$pid.nointer.pred,color="No interaction"))+geom_line(aes(y=pid.pred.df$pid.inter.pred,color="with Interaction"))+facet_wrap(~pid.pred.df$pid7)+ylab("Probability to switch to Trump")+xlab("Immigration Attitude")+ggtitle("Interaction of Immigration attitudes with party Identification")
+
+```
+```{r}
+
+model1.logit=glm(isTrump~ pid7_num+ educ_num + race_num + gender_num ,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+summary(model1.logit)
+
+```
+```{r}
+model2.logit=glm(isTrump~ pro.img:educ_num +pid7_num+pro.img:race_num+gender_num,family="binomial",data=obama,weights = obama$commonweight_vv_post)
+summary(model2.logit)
+```
+
+```{r}
+Logit.model1.df=expand.grid(pid7_num=c(1,2,3,4,5,6,7,8), educ_num=c(1,2,3,4,5,6), race_num=c(0,1,2,3), gender_num=c(0,1))
+Logit.model2.df=expand.grid(pid7_num=c(1,2,3,4,5,6,7,8), educ_num=c(1,2,3,4,5,6), pro.img=0:4,race_num=c(0,1,2,3), gender_num=c(0,1))
+noimmigration.pred=predict(model1.logit,newdata = Logit.model1.df,type = "response")
+noimmigration.pred=as.vector((noimmigration.pred))
+immigration.pred= predict(model2.logit,newdata = Logit.model2.df,type = "response")
+immigration.pred=as.vector((immigration.pred))
+```
+
+```{r}
+#Forming a new data frame
+model1.pred.df=data.frame(Logit.model1.df,noimmigration.pred)
+model1.pred.df = model1.pred.df %>% mutate(educ = recode(educ_num,'1'='No HS', '2'='High School Grad','3'='Some College', '4'='2-year' , '5'= '4-Year','6'= 'Post_grad'))
+model1.pred.df = model1.pred.df %>% mutate(race = recode(race_num,'0'='White', '1'='Black','2'='Hispanic', '3'='Other'))
+model1.pred.df = model1.pred.df %>% mutate(pid7= recode(pid7_num,'1'= 'Strong Democrat', '2'='Not very strong Democrat' ,'7'='Strong Republican', '6'='Not very strong Republican','3'= 'Lean Democrat','5'='Lean Republican','4'='Independent','8'='Not Sure', ' 0' ='Not Sure'))
+model2.pred.df=data.frame(Logit.model2.df,immigration.pred)
+model2.pred.df = model2.pred.df %>% mutate(educ = recode(educ_num,'1'='No HS', '2'='High School Grad','3'='Some College', '4'='2-year' , '5'= '4-Year','6'= 'Post_grad'))
+model2.pred.df = model2.pred.df %>% mutate(race = recode(race_num,'0'='White', '1'='Black','2'='Hispanic', '3'='Other'))
+model2.pred.df = model2.pred.df %>% mutate(pid7= recode(pid7_num,'1'= 'Strong Democrat', '2'='Not very strong Democrat' ,'7'='Strong Republican', '6'='Not very strong Republican','3'= 'Lean Democrat','5'='Lean Republican','4'='Independent','8'='Not Sure', ' 0' ='Not Sure'))
+```
+
+```{r}
+ggplot(model1.pred.df, aes(x = pid7, y = noimmigration.pred, color = race)) + facet_wrap(~educ) + geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = .9, vjust = .5))
+```
+```{r, fig.width = 10 , fig.height=10 }
+ggplot(model2.pred.df, aes(x = pro.img, y =immigration.pred, color = race)) + facet_grid(educ ~pid7,scales='free_x', space='free_x') + geom_line() + theme(axis.text.x = element_text(angle = 90, hjust = .9, vjust = .5))
+facet_grid(labely~labelx, scales='free_x', space='free_x')
+
+
+
+```
+
+
+
+
+
