@@ -10,3 +10,9 @@ regression models. This is useful but not really sufficient to study this proble
 explore the data and then fit a big and complicated logistic regression model. We won’t attempt
 to assess cause-and-effect, but we can get a sense of whether attitudes toward immigration had
 explanatory power over and above demographic shifts.
+
+•	Engineered the raw data to extract features which would explain the immigration attitude in numerical scale based on the Survey data.
+•	Analyzed the effects of Immigration attitude on all demographic variables available in the data and found visible interactions of variables for modeling purpose.
+•	Implemented Logistic Model to attain the Probabilities of switch (Obama to Trump) concluding 25% pf Obama Voters switched Votes to Trump in 2016 Election
+
+
